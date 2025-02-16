@@ -12,16 +12,6 @@ def download_youtube_audio(url: str, yt_dlp_options: dict) -> bool:
         return False
 
 
-def extract_title_from_url(url: str, yt_dlp_options: dict) -> str:
-    try:
-        with YoutubeDL(yt_dlp_options) as ydl:
-            info_dict = ydl.extract_info(url, download=False)
-            title = info_dict.get("title", "Unknown Title")
-            return title
-    except Exception as e:
-        return "Unknown Title"
-
-
 def batch_download_youtube_audio(urls: list[str], yt_dlp_options: dict) -> None:
     for i in range(len(urls)):
         title = extract_title_from_url(urls[i], yt_dlp_options)
@@ -34,6 +24,16 @@ def batch_download_youtube_audio(urls: list[str], yt_dlp_options: dict) -> None:
             print(f"{Fore.RED}[{i + 1}/{len(urls)}] Downloading:  {title} failed.{Style.RESET_ALL}")
 
 
+def extract_title_from_url(url: str, yt_dlp_options: dict) -> str:
+    try:
+        with YoutubeDL(yt_dlp_options) as ydl:
+            info_dict = ydl.extract_info(url, download=False)
+            title = info_dict.get("title", "Unknown Title")
+            return title
+    except Exception as e:
+        return "Unknown Title"
+
+
 def get_single_song_from_url(url: str) -> str:
     # song is single
     if "&" not in url:
@@ -43,18 +43,15 @@ def get_single_song_from_url(url: str) -> str:
     return url[:end_index]
 
 
-def get_links_from_file(file_path_with_links: str, extract_single_song_from_url: bool) -> list[str]:
+def get_links_from_file(file_path_with_links: str) -> list[str]:
     try:
         with open(file_path_with_links, "r") as file:
-            if not extract_single_song_from_url:
-                return [url.strip() for url in file]
-            
-            return [get_single_song_from_url(url.strip()) for url in file]
+            return [url.strip() for url in file]
     except FileNotFoundError:
         return []
 
 
-def main(file_path_with_links: str, output_dir: str, extract_single_song_from_url=True) -> None:
+def main(file_path_with_links: str, output_dir: str, download_playlists_too=False) -> None:
     # yt-dlp options for downloading audio
     ydl_opts = {
         "format": "bestaudio/best",
@@ -69,20 +66,23 @@ def main(file_path_with_links: str, output_dir: str, extract_single_song_from_ur
                 "preferredquality": "192",
             }
         ],
-        "quiet": True,
     }
 
-    links_from_file = get_links_from_file(file_path_with_links, extract_single_song_from_url)
+    links_from_file = get_links_from_file(file_path_with_links)
     if not links_from_file:
         print(f"{Fore.RED}Empty file or file not found. File name: ({file_path_with_links}){Style.RESET_ALL}")
         print(f"{Fore.RED}Nothing to download. Exiting...{Style.RESET_ALL}")
         return
 
-    batch_download_youtube_audio(links_from_file, ydl_opts)
+    for url in links_from_file:
+        if not download_playlists_too:
+            url = get_single_song_from_url(url)
+
+        batch_download_youtube_audio([url], ydl_opts)
 
 
 if __name__ == "__main__":
     text_file_path_with_urls = "links.txt.example"
     # songs will be saved at - disk D/youtube_songs folder
     output_directory = "/mnt/d/youtube_songs"
-    main(text_file_path_with_urls, output_directory, extract_single_song_from_url=True)
+    main(text_file_path_with_urls, output_directory, download_playlists_too=False)
